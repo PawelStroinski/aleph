@@ -63,7 +63,14 @@
         (netty/put! (.channel ctx) @in
           (if raw-stream?
             msg
-            (netty/release-buf->array msg)))))))
+            (netty/release-buf->array msg))))
+
+      :channel-writability-changed
+      ([_ ctx]
+       ;; TODO: Only do if write backpressure enabled.
+       (let [ch (.channel ctx)]
+         (-> ch .config (.setAutoRead (.isWritable ch))))
+       (.fireChannelWritabilityChanged ctx)))))
 
 (defn start-server
   "Takes a two-arg handler function which for each connection will be called with a duplex

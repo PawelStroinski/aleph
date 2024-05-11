@@ -31,7 +31,8 @@
       ChannelOutboundInvoker
       ChannelPipeline
       EventLoopGroup
-      FileRegion)
+      FileRegion
+      WriteBufferWaterMark)
     (io.netty.channel.epoll
       Epoll
       EpollDatagramChannel
@@ -439,7 +440,11 @@
             (d/finally'
               (fn []
                 ;; disable backpressure
-                (-> ch .config (.setAutoRead true))))
+                ;; TODO: Write a test to confirm that this change is necessary.
+                ;; TODO: Think about race condition with `channel-writability-changed` callback.
+                (when (or false ; something like: `(not write-backpressure-enabled?)`
+                          (.isWritable ch))
+                  (-> ch .config (.setAutoRead true)))))
             (d/chain'
               (fn [result]
                 (when-not result
@@ -1710,6 +1715,8 @@
                      (.childHandler (pipeline-initializer pipeline-builder))
                      (.childOption ChannelOption/SO_REUSEADDR true)
                      (.childOption ChannelOption/MAX_MESSAGES_PER_READ Integer/MAX_VALUE)
+                     ;; TODO: Only do if write backpressure enabled in options. Take watermarks from options.
+                     (.childOption ChannelOption/WRITE_BUFFER_WATER_MARK (WriteBufferWaterMark. (int 100) (int 100)))
                      bootstrap-transform)
 
              ^ServerSocketChannel
